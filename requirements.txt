@@ -1,0 +1,2 @@
+# pip3 install -r requirements.txt
+SQLAlchemy==1.4.31
