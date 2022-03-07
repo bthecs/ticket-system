@@ -1,120 +1,68 @@
-import json
 import socket
 import threading
-from src.database import init_db, conn
-from src.database import Ticket
+from src.database import Database
+from src.commands import Command
+
+
+class ClientHandler:
+    def __init__(self, server, sock, address):
+        self.server = server
+        self.sock = sock
+        self.address = address
+        self.main()
+
+    def parse_message(self, message):
+        args = message.split()
+        command = args.pop(0)
+        print(f'Argumentos: {args}')
+        print(f'Comando: {command}')
+        return command, args
+
+    def main(self):
+        while True:
+            message = self.sock.recv(1024).decode()
+            command, args = self.parse_message(message)
+            if command == 'exit': break
+            Command(self.sock, command, args)
+        # self.server.remove(self)
 
 
 class Server:
-
-    def __init__(self, port=55001):
+    def __init__(self, port):
+        self.server = None
         self.port = port
-        self.socket = None
         self.commands = ["create", "update", "list", "delete"]
+        self.clients = []
+        self.create_socket()
+        self.handle_accept()
 
-    def connect(self) -> None:
-        self.socket = socket.socket(
+    def create_socket(self):
+        self.server = socket.socket(
             socket.AF_INET,
             socket.SOCK_STREAM
         )
+        print('Server Socket created!')
+        self.server.bind(('', self.port))
+        self.server.listen(5)
 
-        self.socket.bind(('', self.port))
-        self.socket.listen(1)
+    # def remove(self, client):
+    #     self.clients.remove(client)
+    #     # self.broadcast(f'Client {client.address} quit!\n')
+    #     print(f'Client {client.address} quit!\n')
+    #
+    # def broadcast(self, message):
+    #     for client in self.clients:
+    #         client.sock.send(message.encode())
 
+    def handle_accept(self):
+        print('Accepting connections')
         while True:
-            client_conn, address = self.socket.accept()
-            thread = threading.Thread(target=self.handler, args=(client_conn, address), daemon=True)
+            client, address = self.server.accept()
+            thread = threading.Thread(target=ClientHandler, args=(self, client, address))
             thread.start()
-
-    def handler(self, client_conn, address: tuple) -> None:
-        db = conn()
-        print(f"Client connected ({address[0]}:{address[1]})")
-        while True:
-            message = client_conn.recv(1024).decode('utf-8')
-            args = message.split()  # ['list', '--title', 'harry']
-            command = args.pop(0)  # 'list'
-            print(f'Argumentos: {args}')
-            print(f'Comando: {command}')
-
-            client_conn.send(command.encode('utf-8'))
-
-            if command == 'create':
-
-                ticket_json = json.loads(client_conn.recv(1024).decode('utf-8'))
-                self.create(ticket_json)
-
-            elif command == 'update':
-                id = int(args.pop())
-                ticket = db.query(Ticket).get(id)
-
-                client_conn.send(json.dumps(ticket.to_json()).encode('utf-8'))
-                ticket_json = json.loads(client_conn.recv(1024).decode('utf-8'))
-                self.update(ticket_json, ticket)
-
-            elif command == 'list':
-                tickets = self.list(args)
-                client_conn.send(json.dumps(tickets).encode('utf-8'))
-
-            elif command == 'delete':
-                id = int(args[0])
-                ticket = db.query(Ticket).get(id)
-                self.delete(ticket)
-            elif command == 'exit':
-                print(f'Client disconnected ({address[0]}:{address[1]})')
-                client_conn.close()
-
-    def create(self, ticket_json):
-        db = conn()
-        ticket = Ticket.from_json(ticket_json)
-        try:
-            db.add(ticket)
-            db.commit()
-            db.close()
-            return 'Ticket created successfully'
-        except Exception as error:
-            db.close()
-            return str(error)
-
-    def update(self, ticket_json, ticket):
-        db = conn()
-        for key, value in ticket_json.items():
-            setattr(ticket, key, value)
-        db.add(ticket)
-        try:
-            db.commit()
-            db.close()
-            return ticket.to_json()
-        except Exception as error:
-            return str(error)
-
-    def list(self, args):
-        db = conn()
-        tickets = db.query(Ticket)
-        if not args:
-            tickets = tickets.order_by(Ticket.date_created.desc())
-        elif args[0] in ('--title', '-t'):
-            tickets = tickets.filter(Ticket.title.like(f'%{args[1]}%'))
-        elif args[0] in ('--author', '-a'):
-            tickets = tickets.filter(Ticket.author.like(f'%{args[1]}%'))
-        elif args[0] in ('--status', '-s'):
-            tickets = tickets.filter(Ticket.status.like(f'%{args[1]}%'))
-        elif args[0] in ('--date', '-d'):
-            tickets = tickets.filter(Ticket.date_created.like(f'%{args[1]}%'))
-        else:
-            return {"error": "Filter not found"}
-        return {"tickets":[ticket.to_json() for ticket in tickets]}
-
-    def delete(self, ticket):
-        db = conn()
-        db.delete(ticket)
-        db.commit()
-        db.close()
-        return 'Delete successfully'
-
-    def run(self):
-        self.connect()
+            self.clients.append(thread)
 
 
 if __name__ == "__main__":
-    init_db()
-    Server().run()
+    Database()
+    Server(55001)

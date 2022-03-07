@@ -1,25 +1,21 @@
 from datetime import datetime
-import json
 from sqlalchemy import create_engine
 from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-
-engine = create_engine('sqlite:///tickets.db')
-connection = engine.connect()
-
-
-def init_db():
-    Model.metadata.create_all(bind=engine)
-
+from src.utils import Singleton
 
 Model = declarative_base(name='Model')
 
 
-def conn():
-    Session = sessionmaker(bind=engine)
-    return Session()
+class Database(Singleton):
+    def __init__(self):
+        self.engine = create_engine('mysql+mysqlconnector://root:root@localhost/tickets')
+        self.session = sessionmaker(bind=self.engine)
+        Model.metadata.create_all(self.engine)
+
+    def get_database(self):
+        return self.session()
 
 
 class Ticket(Model):
@@ -47,13 +43,13 @@ class Ticket(Model):
     # Json -> Object
     @staticmethod
     def from_json(ticket_json):
-        id = ticket_json.get("id")
+        _id = ticket_json.get("id")
         title = ticket_json.get("title")
         author = ticket_json.get("author")
         status = ticket_json.get("status")
         description = ticket_json.get("description")
         return Ticket(
-            id=id,
+            id=_id,
             title=title,
             author=author,
             status=status,

@@ -1,56 +1,75 @@
 import json
 import socket
 
-sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock.connect(('127.0.0.1', 55001))
 
-while True:
-    message = input('-> ')
-    sock.send(message.encode('utf-8'))
-    # command = message[0].split() if message == type(list) else message
+class Client:
+    def __init__(self, port):
+        self.COMMANDS = {
+            'create': self.create,
+            'list': self.list,
+            'update': self.update,
+            'delete': self.delete,
+            'exit': self.exit
+        }
+        self.sock = None
+        self.command = None
+        self.port = port
+        self.create_socket()
+        self.main()
 
-    command = sock.recv(1024).decode('utf-8')
+    def create_socket(self):
+        self.sock = socket.socket(
+            socket.AF_INET,
+            socket.SOCK_STREAM
+        )
+        self.sock.connect(('127.0.0.1', self.port))
 
-    if command == 'create':
+    def main(self):
+        while True:
+            message = input('-> ')
+            self.sock.send(message.encode())
+            self.command = self.sock.recv(1024).decode()
+            if self.command in self.COMMANDS:
+                self.COMMANDS[self.command]()
+
+
+    def create(self):
         title = input('title? ')
         author = input('Author? ')
         description = input('description? ')
         ticket = json.dumps(dict(
             title=title,
             author=author,
-            status='pending',
             description=description,
         ))
-        sock.send(ticket.encode('utf-8'))
+        self.sock.send(ticket.encode())
+        print(self.sock.recv(1024).decode())
 
-    elif command == 'update':
-        ticket_json = json.loads(sock.recv(1024).decode('utf-8'))
+    def list(self):
+        print(self.sock.recv(1024).decode())
+
+    def update(self):
+        ticket_json = json.loads(self.sock.recv(1024).decode())
         for key, value in ticket_json.items():
             print(f'{key}: {value}')
-
         title = input('Title? ')
         description = input('Description? ')
-
-        ticket_updated = json.dumps(dict(
+        ticket_updated = dict(
             id=ticket_json.get('id'),
             title=ticket_json.get('title') if not title else title,
+            description=ticket_json.get('description') if not description else description,
             author=ticket_json.get('author'),
             status=ticket_json.get('status'),
-            description=ticket_json.get('description') if not description else description,
-        ))
-        sock.send(ticket_updated.encode('utf-8'))
+        )
+        self.sock.send(json.dumps(ticket_updated).encode('utf-8'))
+        self.sock.recv(1024).decode()
 
-    elif command == 'list':
-        tickets = json.loads(sock.recv(4096).decode('utf-8'))
-        if "tickets" in tickets.keys():
-            for ticket in tickets['tickets']:
-                print(f"""
-                ###################################
-                N° {ticket.get('id')}
-                Title: {ticket.get('title')}
-                Author: {ticket.get('author')}
-                Status: {ticket.get('status')}
-                Description: {ticket.get('description')}
-                Date Created: {ticket.get('date_created')}""")
-        else:
-            print(tickets["error"])
+    def delete(self):
+        self.sock.recv(1024).decode()
+
+    def exit(self):
+        self.sock.close()
+
+
+if __name__ == "__main__":
+    Client(55001)
