@@ -11,21 +11,23 @@ class Command:
             'update': self.update,
             'delete': self.delete,
             'exit': self.exit,
+            'export': self.export,
         }
         self.command = command
         self.args = args
         self.db = Database().get_database()
         self.client = client
+        self.socket = client.sock
         self.execute()
 
     def execute(self):
         print(f'Executing command: {self.command}')
         if self.command in self.COMMANDS:
-            self.client.send(self.command.encode())
+            self.socket.send(self.command.encode())
             self.COMMANDS[self.command](self.args)
 
     def create(self, _):
-        ticket_json = json.loads(self.client.recv(1024).decode())
+        ticket_json = json.loads(self.socket.recv(1024).decode())
         ticket = Ticket(
             title=ticket_json.get("title"),
             author=ticket_json.get("author"),
@@ -35,7 +37,7 @@ class Command:
         self.db.add(ticket)
         self.db.commit()
         self.db.close()
-        self.client.send('Ticket created successfully!'.encode())
+        self.client.broadcast(f'Ticket created successfully by {self.client.address[0]}:{self.client.address[1]}!')
 
     def list(self, args):
 
@@ -55,7 +57,7 @@ class Command:
 
         self.db.close()
         data = json.dumps({"tickets": [ticket.to_json() for ticket in tickets]})
-        self.client.send(data.encode())
+        self.socket.send(data.encode())
 
     def update(self, args):
         (opt, arg) = getopt.getopt(args[0:], 'i:')
@@ -65,14 +67,14 @@ class Command:
 
         ticket = self.db.query(Ticket).get(_id)
         print(ticket.to_json())
-        self.client.send(json.dumps(ticket.to_json()).encode())
-        ticket_json = json.loads(self.client.recv(1024).decode())
+        self.socket.send(json.dumps(ticket.to_json()).encode())
+        ticket_json = json.loads(self.socket.recv(1024).decode())
         for key, value in ticket_json.items():
             setattr(ticket, key, value)
         self.db.add(ticket)
         self.db.commit()
         self.db.close()
-        self.client.send("Ticket changed successfully".encode())
+        self.socket.send("Ticket changed successfully".encode())
 
     def delete(self, args):
         (opt, arg) = getopt.getopt(args[0:], 'i:')
@@ -86,4 +88,8 @@ class Command:
         self.client.send("Ticket deleted successfully".encode())
 
     def exit(self, _):
-        self.client.close()
+        self.client.remove(self.socket)
+        self.socket.close()
+
+    def export(self, _):
+        pass

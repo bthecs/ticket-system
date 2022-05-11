@@ -1,5 +1,6 @@
 import json
 import socket
+from time import sleep
 
 
 class Client:
@@ -12,7 +13,7 @@ class Client:
             'exit': self.exit
         }
         self.sock = None
-        self.command = None
+        self.message = None
         self.port = port
         self.create_socket()
         self.main()
@@ -25,13 +26,16 @@ class Client:
         self.sock.connect(('127.0.0.1', self.port))
 
     def main(self):
+        self.message = input('-> ')
         while True:
-            message = input('-> ')
-            self.sock.send(message.encode())
-            self.command = self.sock.recv(1024).decode()
-            if self.command in self.COMMANDS:
-                self.COMMANDS[self.command]()
-
+            if not self.message in self.COMMANDS:
+                print(self.message)
+            else:
+                self.sock.send(self.message.encode())
+                self.message = self.sock.recv(1024).decode()
+            if self.message in self.COMMANDS:
+                self.COMMANDS[self.message]()
+            self.message = input('-> ')
 
     def create(self):
         title = input('title? ')
@@ -68,7 +72,9 @@ class Client:
         self.sock.recv(1024).decode()
 
     def exit(self):
-        self.sock.close()
+        sleep(1)
+        exit()
+        # self.sock.close()
 
 
 if __name__ == "__main__":

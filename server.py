@@ -3,6 +3,8 @@ import threading
 from src.database import Database
 from src.commands import Command
 
+clients = []
+
 
 class ClientHandler:
     def __init__(self, server, sock, address):
@@ -11,10 +13,20 @@ class ClientHandler:
         self.address = address
         self.main()
 
+    def remove(self, client):
+        clients.remove(client)
+        print(f'Client quit!')
+        print(f'Clients connected: {len(clients)}')
+
+    def broadcast(self, message):
+        print(message)
+        for client in clients:
+            client.send(message.encode())
+
     def parse_message(self, message):
         args = message.split()
         command = args.pop(0)
-        print(f'Argumentos: {args}')
+        print(f'\nArgumentos: {args}')
         print(f'Comando: {command}')
         return command, args
 
@@ -22,9 +34,9 @@ class ClientHandler:
         while True:
             message = self.sock.recv(1024).decode()
             command, args = self.parse_message(message)
-            if command == 'exit': break
-            Command(self.sock, command, args)
-        # self.server.remove(self)
+            Command(self, command, args)
+            if command == 'exit':
+                break
 
 
 class Server:
@@ -32,7 +44,6 @@ class Server:
         self.server = None
         self.port = port
         self.commands = ["create", "update", "list", "delete"]
-        self.clients = []
         self.create_socket()
         self.handle_accept()
 
@@ -45,22 +56,13 @@ class Server:
         self.server.bind(('', self.port))
         self.server.listen(5)
 
-    # def remove(self, client):
-    #     self.clients.remove(client)
-    #     # self.broadcast(f'Client {client.address} quit!\n')
-    #     print(f'Client {client.address} quit!\n')
-    #
-    # def broadcast(self, message):
-    #     for client in self.clients:
-    #         client.sock.send(message.encode())
-
     def handle_accept(self):
         print('Accepting connections')
         while True:
             client, address = self.server.accept()
             thread = threading.Thread(target=ClientHandler, args=(self, client, address))
             thread.start()
-            self.clients.append(thread)
+            clients.append(client)
 
 
 if __name__ == "__main__":
