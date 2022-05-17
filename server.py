@@ -2,20 +2,27 @@ import socket
 import getopt
 import json
 import threading
-
+import sys
 from src.model.ticket import Ticket
 from src.database import Database
 from src.utils import parse_message
+from logger import Logger
 
 clients = []
 
 
-class ClientHandler:
-    def __init__(self, server, sock, address):
+
+# TODO: config.cfg config.ini config.json "server -c config.ini"
+# TODO: Response JSON like tcp
+# TODO: Fix broadcast
+
+
+
+class ClientHandler():
+    def __init__(self, server, sock, address):        
         self.server = server
         self.socket = sock
         self.address = address
-        self.disconnect = False
         self.db = Database().get_database()
         self.commands = {
             'create': self.create,
@@ -27,15 +34,7 @@ class ClientHandler:
         }
         self.main()
 
-    def remove(self, client):
-        clients.remove(client)
-        print(f'Client quit!')
-        print(f'Clients connected: {len(clients)}')
-
-    def broadcast(self, message):
-        print(message)
-        for client in clients:
-            client.send(message.encode())
+    
 
     def create(self, args):
         (opt, arg) = getopt.getopt(args[0:], 't:a:d')
@@ -50,6 +49,8 @@ class ClientHandler:
                     data['author'] = ar
                 if op == '-d':
                     data['description'] = ar
+                    
+        
 
         ticket = Ticket(
             title=data.get('title'),
@@ -61,7 +62,8 @@ class ClientHandler:
         self.db.add(ticket)
         self.db.commit()
         self.db.close()
-        self.broadcast(f'Ticket created successfully by {self.address[0]}:{self.address[1]}!')
+        logger.info(f'Ticket created successfully by {self.address[0]}:{self.address[1]}!')
+        self.server.broadcast(f'Ticket created successfully by {self.address[0]}:{self.address[1]}!')
 
     def list(self, args):
         (opt, arg) = getopt.getopt(args[0:], 't:a:s:d')
@@ -86,27 +88,32 @@ class ClientHandler:
         (opt, arg) = getopt.getopt(args[0:], 'i:t:d')
 
         data = dict()
-
-        for (op, ar) in opt:
-            if op == '-i':
-                data['id'] = ar
-            if op == '-t':
-                data['title'] = ar
-            if op == '-d':
-                data['description'] = ar
+        if args:
+            for (op, ar) in opt:
+                if op == '-i':
+                    data['id'] = ar
+                if op == '-t':
+                    data['title'] = ar
+                if op == '-d':
+                    data['description'] = ar
+                if op == '-s':
+                    data['status'] = ar
+        else:
+            logger.error(f'No arguments found by {self.address[0]}:{self.address[1]}!')
+            self.socket.send("Enter a valid arguments".encode())
 
         ticket = self.db.query(Ticket).get(data['id'])
 
         data['title'] = data.get('title') if None else ticket.title
         data['description'] = data.get('description') if None else ticket.description
-
-        status = input("\nNew status? ")
+        data['status'] = data.get('status') if None else ticket.status
+        
         ticket_updated = dict(
             id=data.get('id'),
             title=data.get('title'),
             description=data.get('description'),
             author=ticket.author,
-            status=status,
+            status=data.get('status'),
         )
 
         for key, value in ticket_updated.items():
@@ -115,6 +122,7 @@ class ClientHandler:
         self.db.add(ticket)
         self.db.commit()
         self.db.close()
+        logger.info(f'Ticket updated successfully by {self.address[0]}:{self.address[1]}!')
         self.socket.send("Ticket changed successfully".encode())
 
     def delete(self, args):
@@ -126,30 +134,38 @@ class ClientHandler:
         self.db.delete(ticket)
         self.db.commit()
         self.db.close()
+        logger.info(f'Ticket deleted successfully by {self.address[0]}:{self.address[1]}!')
         self.socket.send("Ticket deleted successfully".encode())
 
     def exit(self, _):
-        self.remove(self.socket)
-        self.disconnect = True
-        self.socket.close()
+        logger.info(f'Client {self.address} disconnected!')
+        self.socket.send("Bye".encode())
+        self.server.remove(self.socket)
+        
+        
 
     def export(self, _):
         pass
 
     def main(self):
-        while not self.disconnect:
+    
+        while True:
             message = self.socket.recv(1024).decode()
+            if not message: break
             command, args = parse_message(message)
             if command in self.commands:
-                print(f'Executing command: {command}')
+                logger.info(f'Executing command: {command}')
                 self.commands[command](args)
+            else:
+                logger.error(f'Command not found: {command}')
+                self.socket.send("Enter a valid command".encode())
+                    
 
 
 class Server:
-    def __init__(self, port):
-        self.server = None
+    def __init__(self, host, port):
+        self.host = host
         self.port = port
-        self.commands = ["create", "update", "list", "delete"]
         self.create_socket()
         self.handle_accept()
 
@@ -158,20 +174,45 @@ class Server:
             socket.AF_INET,
             socket.SOCK_STREAM
         )
-        self.server.settimeout(5)
-        print('Server Socket created!')
-        self.server.bind(('', self.port))
+        self.server.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+        logger.info(f'Socket created successfully on {(self.host)}:{self.port}!')
+        self.server.bind((self.host, self.port))
         self.server.listen(5)
+        
+    def remove(self, client):
+        clients.remove(client)
+        logger.info(f'Clients connected: {len(clients)}')
+
+    def broadcast(self, message):
+        for client in clients:
+            client.send(message.encode())
 
     def handle_accept(self):
-        print('Accepting connections')
+        logger.info('Accepting connections')
         while True:
             client, address = self.server.accept()
+            logger.info(f'Connection from {address[0]}:{address[1]}')
             thread = threading.Thread(target=ClientHandler, args=(self, client, address))
             thread.start()
             clients.append(client)
 
 
 if __name__ == "__main__":
+    
+    (opt, arg) = getopt.getopt(sys.argv[1:], 'h:p:d:')
+    host = '127.0.0.1'
+    port = 8080
+    debug = False
+    
+    for (op, ar) in opt:
+        if op == '-h':
+            host = str(ar)
+        if op == '-p':
+            port = int(ar)
+        if op == '-d':
+            if ar.lower() == 'true':
+                debug = True
+
     Database()
-    Server(55001)
+    logger = Logger(debug=debug or False)
+    Server(host, port)

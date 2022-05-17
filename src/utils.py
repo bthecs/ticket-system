@@ -8,12 +8,10 @@ class Singleton(object):
 
 
 def parse_message(message):
-    try:
+    if ' ' in message:
         args = message.split()
         command = args.pop(0)
-    except:
+    else:
         args = []
         command = message
-    print(f'\nArgumentos: {args}')
-    print(f'Comando: {command}')
     return command, args
