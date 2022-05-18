@@ -3,9 +3,15 @@ The purpose of this project is to load tickets onto a server, making use of clie
 
 **Table of Contents**
 
-[TOCM]
-
-[TOC]
+- [🧰 Install](#---install)
+- [🚀 Usage](#---usage)
+  * [👨‍🔧 Client actions](#------client-actions)
+    + [Create](#create)
+    + [Update](#update)
+    + [Delete](#delete)
+    + [List](#list)
+    + [Exit](#exit)
+- [🚨 Protocol](#---protocol)
 
 # 🧰 Install
 
