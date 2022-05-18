@@ -8,10 +8,10 @@ Model = declarative_base(name='Model')
 
 class Database(Singleton):
     def __init__(self):
-        self.engine = create_engine('mysql+mysqlconnector://root:password@localhost/tickets')
+        self.engine = create_engine(
+            'mysql+mysqlconnector://root:password@localhost:3306/tickets')
         self.session = sessionmaker(bind=self.engine)
         Model.metadata.create_all(self.engine)
 
     def get_database(self):
         return self.session()
-

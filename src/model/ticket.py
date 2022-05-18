@@ -8,7 +8,7 @@ class Ticket(Model):
 
     id = Column('id', Integer, primary_key=True)
     title = Column('title', String(60))
-    author = Column('author', String(15))
+    author = Column('author', String(60))
     status = Column('status', String(15))
     description = Column('description', String(120))
     date_created = Column('date_created', DateTime, default=datetime.utcnow)
