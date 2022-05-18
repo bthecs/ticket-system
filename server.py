@@ -3,11 +3,10 @@ import getopt
 import json
 import threading
 import sys
-from urllib import response
+from logger import Logger
 from src.model.ticket import Ticket
 from src.database import Database
 from src.utils import parse_message, make_response
-from logger import Logger
 
 
 class ClientHandler():
