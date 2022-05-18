@@ -3,15 +3,15 @@ The purpose of this project is to load tickets onto a server, making use of clie
 
 **Table of Contents**
 
-- [🧰 Install](#install)
-- [🚀 Usage](#usage)
-  * [👨‍🔧 Client actions](#client-actions)
+- [🧰 Install](#-install)
+- [🚀 Usage](#-usage)
+  * [👨‍🔧 Client actions](#-client-actions)
     + [Create](#create)
     + [Update](#update)
     + [Delete](#delete)
     + [List](#list)
     + [Exit](#exit)
-- [🚨 Protocol](#protocol)
+- [🚨 Protocol](#-protocol)
 
 # 🧰 Install
 
@@ -147,4 +147,4 @@ exit
 # 🚨 Protocol
 The socket used to perform the interconnection is AF_INET is used to designate the type of addresses with which its socket can communicate (in this case, Internet Protocol v4 addresses) and SOCK_STREAM type of the socket, dependent on the previous parameter (not all domains support the same types). In this case, a socket of type STREAM: using the TCP protocol, provides certain security guarantees: packets arrive in order, discarding repeated and/or corrupted packets.
 
-![Socket](https://imgur.com/sAyHJ3E)
+![Socket](https://imgur.com/gallery/sAyHJ3E)
